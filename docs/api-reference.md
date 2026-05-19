@@ -84,11 +84,23 @@ When exceeded, the response includes `Retry-After` and `X-RateLimit-Reset` heade
 
 ## Plans & Mode Access
 
-| Plan | Included Tokens/mo | Query Modes |
-|------|--------------------:|-------------|
-| **Starter** | 10,000 | fast, radiology |
-| **Professional** | 50,000 | fast, deep, radiology |
-| **Enterprise** | Unlimited | fast, deep, rag_cag, mcp, radiology |
+| Plan | Queries/mo | Included Tokens/mo | Query Modes | Rate Limit |
+|------|--------:|-------------------:|-------------|--------:|
+| **Starter** | 1,000 | 100K | fast, rag_cag | 10 RPM |
+| **Professional** | 10,000 | 1M | fast, deep, rag_cag | 30 RPM |
+| **Enterprise** | 100,000 | 10M | fast, deep, rag_cag, mcp | 100 RPM |
+| **Partner Bundled** | 50,000 | Custom | fast, deep, rag_cag | 30 RPM |
+
+All plans also have access to `radiology` and `auto` modes.
+
+**Overage rates** (applied when included token budget is exceeded):
+
+| Plan | Overage Rate |
+|------|-------------|
+| Starter | $0.002 per 1K tokens |
+| Professional | $0.0015 per 1K tokens |
+| Enterprise | $0.001 per 1K tokens |
+| Partner Bundled | N/A (custom budget) |
 
 ---
 
@@ -736,6 +748,7 @@ All clinical resource endpoints follow the same pattern:
 | Procedure | `GET /fhir/Procedure` | `subject`, `code`, `_count`, `_offset` |
 | Observation | `GET /fhir/Observation` | `subject`, `code`, `date`, `_count`, `_offset` |
 | Immunization | `GET /fhir/Immunization` | `subject`, `vaccine_code`, `_count`, `_offset` |
+| AllergyIntolerance | `GET /fhir/AllergyIntolerance` | `subject`, `code`, `_count`, `_offset` |
 | ImagingStudy | `GET /fhir/ImagingStudy` | `subject`, `modality`, `_count`, `_offset` |
 | DiagnosticReport | `GET /fhir/DiagnosticReport` | `subject`, `status`, `_count`, `_offset` |
 
@@ -1141,9 +1154,9 @@ curl https://api.medintelligent.ai/billing/usage \
 
 ### FHIR Resource Support
 
-Fully supported (read + search + ingest): Patient, Encounter, Condition, MedicationRequest, Procedure, Observation, Immunization, ImagingStudy, DiagnosticReport.
+Fully supported (read + search + ingest): Patient, Encounter, Condition, MedicationRequest, Procedure, Observation, Immunization, AllergyIntolerance, ImagingStudy, DiagnosticReport.
 
-Declared in CapabilityStatement (stub): AllergyIntolerance, CarePlan, CareTeam, Device, DocumentReference, Goal, Location, Medication, Organization, Practitioner, PractitionerRole, Provenance, RelatedPerson, ServiceRequest.
+Declared in CapabilityStatement (stub): CarePlan, CareTeam, Device, DocumentReference, Goal, Location, Medication, Organization, Practitioner, PractitionerRole, Provenance, RelatedPerson, ServiceRequest.
 
 ---
 
