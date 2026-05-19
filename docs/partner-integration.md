@@ -432,6 +432,80 @@ Verify that `TELEMEDICINE_WEBHOOK_SECRET` matches exactly between your platform'
 
 ---
 
+## Coupling Requirements
+
+### Prerequisites for Partner Integration
+
+Before coupling your application with NanoSense, verify the following:
+
+| Requirement | Description |
+|-------------|-------------|
+| **Tenant registration** | Register via `POST /tenants/register-partner` with `X-Partner-Key` header. Returns `mrag_...` API key (shown once). |
+| **FHIR R4 Bundle format** | Patient data must be a valid FHIR R4 Bundle with `type: "transaction"`. Each entry needs a `resource` and `request` block. |
+| **Supported resource types** | Patient, Encounter, Condition, MedicationRequest, Procedure, Observation, Immunization, AllergyIntolerance. Other types return 422. |
+| **Request body limit** | Maximum 1 MB per request. Large bundles must be split into batches. |
+| **TLS 1.2+** | All API traffic must use HTTPS. Plaintext HTTP is rejected. |
+| **API key security** | Store `mrag_...` keys server-side only. Never embed in client-side code or source control. |
+
+### Data Flow Requirements
+
+```
+Partner System                            NanoSense RAG API
+──────────────                            ──────────────────
+1. Register partner tenant  ────────────► POST /tenants/register-partner
+   X-Partner-Key: <shared_key>            ← { api_key: "mrag_..." }
+
+2. Push FHIR Bundle         ────────────► POST /fhir/Bundle
+   X-API-Key: mrag_...                    ← { type: "transaction-response" }
+   (batch if > 1 MB)                        Per-resource status codes
+
+3. Query patient data        ────────────► POST /query
+   X-API-Key: mrag_...                    ← { answer, confidence, sources }
+   { question, mode, patient_id }
+
+4. Check billing (optional)  ────────────► GET /billing/usage
+   X-API-Key: mrag_...                    ← { total_tokens, included_tokens }
+```
+
+### Validated Coupling Points
+
+The following integration points have been validated in production with real patient data:
+
+| Coupling Point | Validated | Notes |
+|----------------|-----------|-------|
+| Tenant registration | Yes | Returns API key, tenant_id, plan details |
+| FHIR Bundle ingest | Yes | 1,068 resources across 8 types; batched for 1 MB limit |
+| FHIR read-back | Yes | Patient, Condition, MedicationRequest, Observation search |
+| RAG query (fast) | Yes | < 4s response time, clinically accurate answers |
+| RAG query (deep) | Yes | Multi-step reasoning, higher latency (~5s) |
+| RAG query (rag_cag) | Yes | Retrieval + caching, balanced performance |
+| Mode enforcement | Yes | Partner Bundled: fast/deep/rag_cag allowed; mcp blocked |
+| Rate-limit headers | Yes | X-RateLimit-Limit/Remaining/Reset on all responses |
+| Billing metering | Yes | Token usage tracked per tenant with correct plan limits |
+| Tenant isolation | Yes | RLS enforced; API keys scoped to single tenant |
+
+### Rate Limits for Partners
+
+| Plan | Queries/Month | Rate Limit | Included Tokens |
+|------|--------:|--------:|--------:|
+| Partner Bundled | 50,000 | 30 RPM | Custom budget |
+
+Partners who exceed the rate limit receive HTTP 429 with `Retry-After` and `X-RateLimit-Reset` headers.
+
+### FHIR Bundle Batching Guide
+
+The API enforces a 1 MB request body limit. For large patient bundles, split resources into batches:
+
+| Batch | Resource Types | Typical Size |
+|-------|---------------|-------------|
+| 1 | Patient, Encounter, Condition, MedicationRequest, Immunization, AllergyIntolerance | ~280 KB |
+| 2 | Observation, Procedure | ~520 KB |
+| 3 | DiagnosticReport (optional) | ~235 KB |
+
+Each batch is a separate `POST /fhir/Bundle` request. Resources are upserted by ID — re-ingesting the same bundle is idempotent.
+
+---
+
 ## Security Checklist for Partners
 
 Before going to production, verify the following:
